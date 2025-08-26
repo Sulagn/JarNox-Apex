@@ -14,7 +14,7 @@
 
 ## Tech Stack
 
-- **Frontend:** React.js, Tailwind CSS, Recharts (or any chart library you used)  
+- **Frontend:** React.js, Tailwind CSS 
 - **Version Control:** Git & GitHub  
 - **Backend:** Python
 
