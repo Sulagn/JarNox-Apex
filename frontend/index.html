@@ -1,0 +1,182 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>JarNox Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f8f9fc;
+      margin: 0;
+      padding: 2rem;
+    }
+    h1 {
+      margin-bottom: 1rem;
+    }
+    input, button, select {
+      padding: 0.5rem;
+      margin: 0.5rem;
+      font-size: 1rem;
+    }
+    #stats {
+      background: #fff;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      border-radius: 12px;
+      padding: 1rem;
+      margin: 1rem auto;
+      width: 400px;
+      text-align: left;
+    }
+    canvas {
+      margin-top: 2rem;
+      max-width: 900px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>📈 JarNox Stock Dashboard</h1>
+
+    <!-- Dropdown for Popular Stocks -->
+    <label for="preset">Choose Stock:</label>
+    <select id="preset" onchange="setTicker()">
+      <option value="">--Select--</option>
+      <option value="AAPL">Apple (AAPL)</option>
+      <option value="TSLA">Tesla (TSLA)</option>
+      <option value="MSFT">Microsoft (MSFT)</option>
+      <option value="AMZN">Amazon (AMZN)</option>
+      <option value="GOOGL">Google (GOOGL)</option>
+    </select>
+
+    <!-- Manual input for custom stock -->
+    <input type="text" id="ticker" placeholder="Or enter stock symbol" />
+    <button onclick="fetchStock()">Get Data</button>
+
+    <!-- Quick Stats Card -->
+    <div id="stats" class="stats-card"></div>
+
+    <!-- Chart Containers -->
+    <canvas id="stockChart" height="400"></canvas>
+    <canvas id="volumeChart" height="200"></canvas>
+  </main>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js Zoom Plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.0"></script>
+
+  <script>
+    let stockChart;
+    let volumeChart;
+
+    function setTicker() {
+      const preset = document.getElementById("preset").value;
+      if (preset) {
+        document.getElementById("ticker").value = preset;
+        fetchStock(); // auto fetch when dropdown changes
+      }
+    }
+
+    async function fetchStock() {
+      const ticker = document.getElementById("ticker").value.trim();
+      if (!ticker) return alert("Please enter or select a stock symbol!");
+
+      const res = await fetch(`/api/stock/${ticker}`);
+      const data = await res.json();
+
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+
+      // Extract labels (time), prices, volume
+      const labels = data.map(item => item.Datetime);
+      const prices = data.map(item => item.Close);
+      const volumes = data.map(item => item.Volume);
+
+      // Quick Stats
+      const latest = data[data.length - 1];
+      const high = Math.max(...data.map(d => d.High));
+      const low = Math.min(...data.map(d => d.Low));
+
+      document.getElementById("stats").innerHTML = `
+        <h3>${ticker} Snapshot</h3>
+        <p><strong>Last Close:</strong> $${latest.Close.toFixed(2)}</p>
+        <p><strong>High:</strong> $${high.toFixed(2)} | 
+           <strong>Low:</strong> $${low.toFixed(2)}</p>
+        <p><strong>Volume:</strong> ${latest.Volume.toLocaleString()}</p>
+      `;
+
+      // Destroy old charts if they exist
+      if (stockChart) stockChart.destroy();
+      if (volumeChart) volumeChart.destroy();
+
+      const ctx1 = document.getElementById("stockChart").getContext("2d");
+      const ctx2 = document.getElementById("volumeChart").getContext("2d");
+
+      // Line chart for stock price
+      stockChart = new Chart(ctx1, {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `${ticker} Closing Price`,
+            data: prices,
+            borderColor: "blue",
+            backgroundColor: "rgba(0,0,255,0.1)",
+            tension: 0.2,
+            fill: true,
+            yAxisID: "y"
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: true },
+            zoom: {
+              pan: { enabled: true, mode: "x" },
+              zoom: { wheel: { enabled: true }, mode: "x" }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: "Time" } },
+            y: { title: { display: true, text: "Price (USD)" } }
+          }
+        }
+      });
+
+      // Bar chart for volume
+      volumeChart = new Chart(ctx2, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `${ticker} Volume`,
+            data: volumes,
+            backgroundColor: "rgba(0, 128, 0, 0.6)",
+            yAxisID: "y"
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            zoom: {
+              pan: { enabled: true, mode: "x" },
+              zoom: { wheel: { enabled: true }, mode: "x" }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: "Time" } },
+            y: { title: { display: true, text: "Volume" } }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
